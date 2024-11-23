@@ -106,8 +106,8 @@ if __name__ == "__main__":
     net = net.to(device)
 
     resize = 1
-
-    cam = cv2.VideoCapture(0)
+    soruce='rtsp://192.168.1.164:554/stream'
+    cam = cv2.VideoCapture(soruce)
     fps = cam.get(cv2.CAP_PROP_FPS)
     print(fps)
 

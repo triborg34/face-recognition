@@ -224,7 +224,7 @@ def tracking(detector, args):
     # Initialize a tracker and a timer
     tracker = BYTETracker(args=args, frame_rate=30)
     frame_id = 0
-
+    soruce='rtsp://192.168.1.164:554/stream'
     cap = cv2.VideoCapture(0)
 
     while True:

@@ -13,6 +13,7 @@ detector = SCRFD(model_file="face_detection/scrfd/weights/scrfd_2.5g_bnkps.onnx"
 
 def main():
     # Open the camera
+    soruce='rtsp://192.168.1.164:554/stream'
     cap = cv2.VideoCapture(0)
 
     # Initialize variables for measuring frame rate

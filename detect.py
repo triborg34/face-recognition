@@ -12,6 +12,7 @@ detector = Yolov5Face(model_file="face_detection/yolov5_face/weights/yolov5m-fac
 
 def main():
     # Open the camera
+    soruce='rtsp://192.168.1.164:554/stream'
     cap = cv2.VideoCapture(0)
 
     # Initialize variables for measuring frame rate
