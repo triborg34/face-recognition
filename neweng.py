@@ -63,12 +63,13 @@ class RTSPVideoStream:
 
 
 class FaceDetectionSystem:
-    def __init__(self, model_path, feature_path, arcface_model_path):
+    def __init__(self, model_path, feature_path, arcface_model_path,person_path):
         """Initialize the face detection and recognition system."""
         # YOLO face detection model
         self.model = YOLO(model_path)
         self.model.conf = 0.3
         self.model.iou = 0.5
+        self.person_model=YOLO(person_path,)
         
         # ArcFace model for recognition
         self.recognizer = iresnet_inference(
@@ -108,60 +109,98 @@ class FaceDetectionSystem:
         score, id_min = compare_encodings(query_emb, self.images_embs)
         name = self.images_names[id_min] if score[0] >= 0.25 else "Unknown"
         return name, score[0]
-
+    #
     def process_frame(self, frame):
-        """Detect faces and recognize them."""
+        """Detect persons first, then detect faces and recognize them."""
         self.frame_times.append(time.time())
         fps = self.calculate_fps()
 
-        # Detect faces
-        results = self.model(frame)
+        # Detect persons first
+        person_results = self.person_model(frame, classes=[0])
 
-        for result in results:
-            for box in result.boxes:
-                # Extract bounding box
-                x1, y1, x2, y2 = map(int, box.xyxy[0].cpu().numpy())
-                confidence = float(box.conf[0])
+        if person_results and len(person_results[0].boxes) > 0:
+            for res in person_results:
+                for box in res.boxes:
+                    x1, y1, x2, y2 = map(int, box.xyxy[0].cpu().numpy())
+                    personconf = float(box.conf[0])
 
-                if confidence < 0.3:
-                    continue
+                    # Draw person bounding box on frame (Blue)
+                    cv2.rectangle(frame, (x1, y1), (x2, y2), (255, 0, 0), 2)
 
-                # Crop the face for recognition
-                face_image = frame[y1:y2, x1:x2]
-                if face_image.size == 0:
-                    continue
+                    # Extract person region (cropped person)
+                    cropped_person = frame[y1:y2, x1:x2]
 
-                # Recognize the face
-                name, score = self.recognize_face(face_image)
+                    # Only process face detection if confidence is high
+                    if personconf >= 0.7:
+                        results = self.model(cropped_person)
 
-                # Draw bounding box and label
-                label = f"{name} ({score:.2f})"
-                cv2.rectangle(frame, (x1, y1), (x2, y2), (0, 255, 0), 2)
-                cv2.putText(frame, label, (x1, y1 - 10),
-                            cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
+                        for result in results:
+                            for box in result.boxes:
+                                # Extract face bounding box (relative to cropped_person)
+                                x1_face, y1_face, x2_face, y2_face = map(int, box.xyxy[0].cpu().numpy())
+                                confidence = float(box.conf[0])
+
+                                if confidence < 0.3:
+                                    continue
+
+                                # Ensure face bounding box is within cropped_person dimensions
+                                h, w, _ = cropped_person.shape
+                                x1_face = max(0, min(x1_face, w - 1))
+                                x2_face = max(0, min(x2_face, w - 1))
+                                y1_face = max(0, min(y1_face, h - 1))
+                                y2_face = max(0, min(y2_face, h - 1))
+
+                                # Crop face image for recognition
+                                face_image = cropped_person[y1_face:y2_face, x1_face:x2_face]
+                                if face_image.size == 0:
+                                    continue
+
+                                # Recognize face
+                                name, score = self.recognize_face(face_image)
+
+                                # Convert face bounding box to full-frame coordinates
+                                face_x1, face_y1, face_x2, face_y2 = (
+                                    x1 + x1_face, y1 + y1_face, x1 + x2_face, y1 + y2_face
+                                )
+
+                                # Ensure face box is within full frame
+                                H, W, _ = frame.shape
+                                face_x1 = max(0, min(face_x1, W - 1))
+                                face_x2 = max(0, min(face_x2, W - 1))
+                                face_y1 = max(0, min(face_y1, H - 1))
+                                face_y2 = max(0, min(face_y2, H - 1))
+
+                                # Draw face bounding box & label on full frame (Green)
+                                label = f"{name} ({score:.2f})"
+                                cv2.rectangle(frame, (face_x1, face_y1), (face_x2, face_y2), (0, 255, 0), 2)
+                                cv2.putText(frame, label, (face_x1, face_y1 - 10),
+                                            cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
 
         # Display FPS
         cv2.putText(frame, f"FPS: {fps:.1f}", (10, 30),
                     cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
+        
         return frame
+
 
 
 def main():
     # Paths
-    video_source = "rtsp://192.168.1.164:554/stream"
+    video_source = "rtsp://192.168.1.7:554/stream"
     model_path = "yolov8n-face.pt"
+    person_path="yolov8n.pt"
     feature_path = "./datasets/face_features/feature"
     arcface_model_path = "./face_recognition/arcface/weights/arcface_r100.pth"
 
     # Initialize system
-    face_system = FaceDetectionSystem(model_path, feature_path, arcface_model_path)
+    face_system = FaceDetectionSystem(model_path, feature_path, arcface_model_path,person_path)
     stream = RTSPVideoStream(video_source).start()
 
     try:
         while True:
             ret, frame = stream.read()
             if not ret:
-                print("Failed to read frame")
+                # print("Failed to read frame")
                 continue
 
             # Process frame
