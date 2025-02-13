@@ -231,3 +231,4 @@ migrations/
 
 # BBDD
 *.db
+images/

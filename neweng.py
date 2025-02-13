@@ -1,7 +1,9 @@
+import random
 import cv2
 import numpy as np
 import threading
 import time
+import requests
 from ultralytics import YOLO
 from collections import deque
 from torchvision import transforms
@@ -10,6 +12,7 @@ from face_alignment.alignment import norm_crop
 from face_recognition.arcface.model import iresnet_inference
 from face_recognition.arcface.utils import compare_encodings, read_features
 import logging
+from PIL import Image
 import warnings
 logging.getLogger("ultralytics").setLevel(logging.ERROR)
 warnings.filterwarnings("ignore", category=FutureWarning)
@@ -154,9 +157,27 @@ class FaceDetectionSystem:
                                 face_image = cropped_person[y1_face:y2_face, x1_face:x2_face]
                                 if face_image.size == 0:
                                     continue
-
+                                
                                 # Recognize face
                                 name, score = self.recognize_face(face_image)
+                                randomNumber=random.randint(1,10000)
+                                cv2.imwrite(f"images/face/image_{name}_{randomNumber}.jpg", face_image)
+                                cv2.imwrite(f"images/frame/frame_{name}_{randomNumber}.jpg", frame)
+                                file1=open(f"images/face/image_{name}_{randomNumber}.jpg", "rb")
+                                file2=open(f"images/frame/frame_{name}_{randomNumber}.jpg", "rb")
+                                files={
+                                    "image": (f"images/face/image_{name}_{randomNumber}.jpg", file1, "image/jpeg"),
+                                    "frame": (f"/imagesframe/frame_{name}_{randomNumber}.jpg", file2, "image/jpeg"),
+                                }
+                                # with open(f"image_{name}_{randomNumber}.jpg", "rb")  as file1 ,open(f"frame_{name}_{randomNumber}.jpg", "rb") as file2:
+                                #     files = {
+                                #         "image": (f"image_{name}_{randomNumber}.jpg", file1, "image/jpeg"),
+                                #         "frame": (f"frame_{name}_{randomNumber}.jpg", file2, "image/jpeg"),
+                                #     }
+                                    
+                                res=requests.post("http://127.0.0.1:8090/api/collections/faces/records",data={"name":name,"confidence":score,},files=files)
+                                # if name != "Unknown":
+                                #     cv2.imwrite("face.jpg", face_image)
 
                                 # Convert face bounding box to full-frame coordinates
                                 face_x1, face_y1, face_x2, face_y2 = (
