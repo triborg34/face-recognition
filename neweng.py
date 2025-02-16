@@ -165,7 +165,7 @@ class FaceDetectionSystem:
 
 
                                 # Convert face bounding box to full-frame coordinates
-                                if score > 0.6:
+                                if score > 0.0:
                                     
                                     face_x1, face_y1, face_x2, face_y2 = (
                                         x1 + x1_face, y1 + y1_face, x1 + x2_face, y1 + y2_face
