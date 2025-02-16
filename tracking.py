@@ -21,8 +21,8 @@ def load_config(file_name):
 # Function for performing object detection and tracking
 def inference(detector, args):
     # Open a video capture object
-    soruce='rtsp://192.168.1.164:554/stream'
-    cap = cv2.VideoCapture(0)
+    soruce='rtsp://192.168.1.245:554/stream'
+    cap = cv2.VideoCapture(soruce)
 
     # Initialize variables for measuring frame rate
     start_time = time.time_ns()

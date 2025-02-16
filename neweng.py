@@ -1,4 +1,4 @@
-import random
+
 import cv2
 import numpy as np
 import threading
@@ -8,11 +8,11 @@ from ultralytics import YOLO
 from collections import deque
 from torchvision import transforms
 import torch
+from database import insertToPocketBase
 from face_alignment.alignment import norm_crop
 from face_recognition.arcface.model import iresnet_inference
 from face_recognition.arcface.utils import compare_encodings, read_features
 import logging
-from PIL import Image
 import warnings
 logging.getLogger("ultralytics").setLevel(logging.ERROR)
 warnings.filterwarnings("ignore", category=FutureWarning)
@@ -72,7 +72,8 @@ class FaceDetectionSystem:
         self.model = YOLO(model_path)
         self.model.conf = 0.3
         self.model.iou = 0.5
-        self.person_model=YOLO(person_path,)
+        self.person_model=YOLO(person_path)
+
         
         # ArcFace model for recognition
         self.recognizer = iresnet_inference(
@@ -160,42 +161,31 @@ class FaceDetectionSystem:
                                 
                                 # Recognize face
                                 name, score = self.recognize_face(face_image)
-                                randomNumber=random.randint(1,10000)
-                                cv2.imwrite(f"images/face/image_{name}_{randomNumber}.jpg", face_image)
-                                cv2.imwrite(f"images/frame/frame_{name}_{randomNumber}.jpg", frame)
-                                file1=open(f"images/face/image_{name}_{randomNumber}.jpg", "rb")
-                                file2=open(f"images/frame/frame_{name}_{randomNumber}.jpg", "rb")
-                                files={
-                                    "image": (f"images/face/image_{name}_{randomNumber}.jpg", file1, "image/jpeg"),
-                                    "frame": (f"/imagesframe/frame_{name}_{randomNumber}.jpg", file2, "image/jpeg"),
-                                }
-                                # with open(f"image_{name}_{randomNumber}.jpg", "rb")  as file1 ,open(f"frame_{name}_{randomNumber}.jpg", "rb") as file2:
-                                #     files = {
-                                #         "image": (f"image_{name}_{randomNumber}.jpg", file1, "image/jpeg"),
-                                #         "frame": (f"frame_{name}_{randomNumber}.jpg", file2, "image/jpeg"),
-                                #     }
-                                    
-                                res=requests.post("http://127.0.0.1:8090/api/collections/faces/records",data={"name":name,"confidence":score,},files=files)
-                                # if name != "Unknown":
-                                #     cv2.imwrite("face.jpg", face_image)
+
+
 
                                 # Convert face bounding box to full-frame coordinates
-                                face_x1, face_y1, face_x2, face_y2 = (
-                                    x1 + x1_face, y1 + y1_face, x1 + x2_face, y1 + y2_face
-                                )
+                                if score > 0.6:
+                                    
+                                    face_x1, face_y1, face_x2, face_y2 = (
+                                        x1 + x1_face, y1 + y1_face, x1 + x2_face, y1 + y2_face
+                                    )
 
-                                # Ensure face box is within full frame
-                                H, W, _ = frame.shape
-                                face_x1 = max(0, min(face_x1, W - 1))
-                                face_x2 = max(0, min(face_x2, W - 1))
-                                face_y1 = max(0, min(face_y1, H - 1))
-                                face_y2 = max(0, min(face_y2, H - 1))
+                                    # Ensure face box is within full frame
+                                    H, W, _ = frame.shape
+                                    face_x1 = max(0, min(face_x1, W - 1))
+                                    face_x2 = max(0, min(face_x2, W - 1))
+                                    face_y1 = max(0, min(face_y1, H - 1))
+                                    face_y2 = max(0, min(face_y2, H - 1))
 
-                                # Draw face bounding box & label on full frame (Green)
-                                label = f"{name} ({score:.2f})"
-                                cv2.rectangle(frame, (face_x1, face_y1), (face_x2, face_y2), (0, 255, 0), 2)
-                                cv2.putText(frame, label, (face_x1, face_y1 - 10),
-                                            cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
+                                    # Draw face bounding box & label on full frame (Green)
+                                    label = f"{name} ({score:.2f})"
+                                    cv2.rectangle(frame, (face_x1, face_y1), (face_x2, face_y2), (0, 255, 0), 2)
+                                    
+                                    cv2.putText(frame, label, (face_x1, face_y1 - 10),
+                                                cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
+                                    insertToPocketBase(name=name,score=score,face_image=face_image,frame=frame)
+                                
 
         # Display FPS
         cv2.putText(frame, f"FPS: {fps:.1f}", (10, 30),
@@ -207,7 +197,7 @@ class FaceDetectionSystem:
 
 def main():
     # Paths
-    video_source = "rtsp://192.168.1.7:554/stream"
+    video_source = "rtsp://192.168.1.4/stream"
     model_path = "yolov8n-face.pt"
     person_path="yolov8n.pt"
     feature_path = "./datasets/face_features/feature"

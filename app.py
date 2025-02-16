@@ -12,7 +12,7 @@ from neweng import FaceDetectionSystem, RTSPVideoStream
 app = Flask(__name__)
 POCKETBASE_URL = "http://127.0.0.1:8090/api/collections/faces/records"
 # Paths
-video_source = "rtsp://192.168.1.7:554/stream"
+video_source = "rtsp://192.168.1.245:554/stream"
 model_path = "yolov8n-face.pt"
 person_path = "yolov8n.pt"
 feature_path = "./datasets/face_features/feature"
